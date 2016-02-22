@@ -8,6 +8,8 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 LPTSTR target;
 int showCmd;
 
+LPCTSTR CheckShellExecuteResult(int result);
+
 INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	if (uMsg == WM_COMMAND) {
@@ -16,22 +18,29 @@ INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 			LPTSTR params = HeapAlloc(GetProcessHeap(), 0, length);
 			if (params) {
 				GetDlgItemText(hwndDlg, IDC_PARAMS, params, length);
-				ShellExecute(hwndDlg, NULL, GetCommandLine(), params, NULL, showCmd);
+				
+				LPCTSTR msg = CheckShellExecuteResult((int)ShellExecute(hwndDlg, NULL, target, params, NULL, showCmd));
+				if (msg) {
+					// If msg is not NULL, it means there was an error and it points to an error message.
+					MessageBox(hwndDlg, msg, TEXT("Error"), MB_ICONERROR);
+				} else {
+					PostQuitMessage(0);
+				}
+				
 				HeapFree(GetProcessHeap(), 0, params);
-				EndDialog(hwndDlg, IDOK);
 				return TRUE;
 			} else {
 				MessageBox(hwndDlg, TEXT("Out of memory"), TEXT("Error"), MB_ICONERROR);
 				return TRUE;
 			}
 		} else if (wParam == IDCANCEL) {
-			EndDialog(hwndDlg, IDCANCEL);
+			PostQuitMessage(1);
 			return TRUE;
 		} else {
 			return FALSE;
 		}
 	} else if (uMsg == WM_CLOSE) {
-		EndDialog(hwndDlg, IDCANCEL);
+		PostQuitMessage(1);
 		return TRUE;
 	} else {
 		return FALSE;
@@ -56,11 +65,44 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	target = lpCmdLine;
 #endif
 
-	DialogBox(hInstance, MAKEINTRESOURCE(IDD_MAINDLG), NULL, DialogProc);
+	HWND hWnd = CreateDialog(hInstance, MAKEINTRESOURCE(IDD_MAINDLG), NULL, DialogProc);
+	ShowWindow(hWnd, SW_SHOWNORMAL);
+
+	MSG msg; while (GetMessage(&msg, hWnd, 0, 0)) {
+		if (!IsDialogMessage(hWnd, &msg)) {
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+	}
+
+	DestroyWindow(hWnd);
 
 #ifdef _UNICODE
-	HeapFree(GetProcessHeap(), 0, target);
+	//HeapFree(GetProcessHeap(), 0, target); //Why isn't this working?
 #endif
 
 	return 0;
+}
+
+LPCTSTR CheckShellExecuteResult(int result)
+{
+	if (result > 32) {
+		return NULL;
+	} else {
+		switch (result) {
+			case 0: case SE_ERR_OOM: return TEXT("The operating system is out of memory or resources.");
+			case ERROR_FILE_NOT_FOUND: return TEXT("The specified file was not found.");
+			case ERROR_PATH_NOT_FOUND: return TEXT("The specified path was not found.");
+			case ERROR_BAD_FORMAT: return TEXT("The specified program is not a valid EXE file.");
+			case SE_ERR_ACCESSDENIED: return TEXT("The operating system denied access to the specified file.");
+			case SE_ERR_ASSOCINCOMPLETE: return TEXT("The file name association is incomplete or invalid.");
+			case SE_ERR_DDEBUSY: return TEXT("The DDE transaction could not be completed because other DDE transactions were being processed.");
+			case SE_ERR_DDEFAIL: return TEXT("The DDE transaction failed.");
+			case SE_ERR_DDETIMEOUT: return TEXT("The DDE transaction could not be completed because the request timed out.");
+			case SE_ERR_DLLNOTFOUND: return TEXT("The specified DLL was not found.");
+			case SE_ERR_NOASSOC: return TEXT("There is no application associated with the given file extension.");
+			case SE_ERR_SHARE: return TEXT("A sharing violation occurred.");
+			default: return TEXT("An unknown error occurred.");
+		}
+	}
 }
