@@ -4,6 +4,7 @@
 LPTSTR target;
 int showCmd;
 
+void MoveWindowToCursor(HWND hWnd);
 LPCTSTR CheckShellExecuteResult(int result);
 
 INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -62,6 +63,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 #endif
 
 	HWND hWnd = CreateDialog(hInstance, MAKEINTRESOURCE(IDD_MAINDLG), NULL, DialogProc);
+	MoveWindowToCursor(hWnd);
 	ShowWindow(hWnd, SW_SHOWNORMAL);
 
 	MSG msg; while (GetMessage(&msg, hWnd, 0, 0)) {
@@ -78,6 +80,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 #endif
 
 	return 0;
+}
+
+void MoveWindowToCursor(HWND hWnd)
+{
+	RECT rect;
+	GetWindowRect(hWnd, &rect);
+	int winWidth = rect.right - rect.left;
+	int winHeight = rect.bottom - rect.top;
+	POINT cursorPos;
+	GetCursorPos(&cursorPos);
+	int winX = min(cursorPos.x, GetSystemMetrics(SM_CXSCREEN) - winWidth);
+	int winY = min(cursorPos.y, GetSystemMetrics(SM_CYSCREEN) - winHeight);
+	MoveWindow(hWnd, winX, winY, winWidth, winHeight, FALSE);
 }
 
 LPCTSTR CheckShellExecuteResult(int result)
